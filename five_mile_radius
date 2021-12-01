@@ -5,6 +5,7 @@
 
 library(here)
 library(sf)
+library(dplyr)
 
 # fill in the lat and lon with the decimal degree coordinates of the center of 
 # your birding circle.
@@ -48,3 +49,22 @@ circle <- list(rbind(circle, circle[1, 1:2]))
 circle <- st_sfc(st_polygon(circle), crs = 4326)
 
 st_write(circle, here(paste0(name, "_5mr.kml")), driver = "kml")
+
+# check for locations inside your 5mr
+## download personal data from ebird.org/downloadMyData
+# read in your ebird data
+ebird <- read.csv(here("data", "MyEBirdData.csv")) %>%
+  distinct(Location, .keep_all = TRUE)
+
+# convert the locations to a spatial object
+ebird_locs <- st_as_sf(ebird[, c("Location", "Latitude", "Longitude")], 
+                       coords = c("Longitude", "Latitude"), crs = 4326) 
+
+# filter out the locations that aren't within the circle
+ebird_locs <- ebird_locs[which(
+  lengths(st_intersects(ebird_locs, circle)) > 0
+  ), ] %>%
+  rename(Name = Location)
+
+write.csv(ebird_locs, here(paste0(name, "_5mr_locs.csv")), row.names = FALSE)
+st_write(ebird_locs, here(paste0(name, "_5mr_locs.kml")), driver = "kml")
