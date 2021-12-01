@@ -1,0 +1,50 @@
+# 20211201
+# Five Mile Radius Birding
+## Create a kml file that can be loaded into google maps to show where the 
+## five mile radius from your start point would be.
+
+library(here)
+library(sf)
+
+# fill in the lat and lon with the decimal degree coordinates of the center of 
+# your birding circle.
+centerpoint <- data.frame(lat = 39.02975, 
+                          lon = -77.10821)
+
+# name of the circle
+name <- "gjf"
+
+# function based off: https://stackoverflow.com/questions/23071026/drawing-a-circle-with-a-radius-of-a-defined-distance-in-a-map
+get_5mr <- function(lat, lon) {
+  # lat, lon need to be in decimal degrees
+  circle_radius <- 5 # miles
+  earth_radius <- 3959 # miles
+  angle_degrees <- seq(1:360)
+  lat_radians_center <- lat*(pi/180)
+  lon_radians_center <- lon*(pi/180)
+  angle_radians <- angle_degrees*(pi/180)
+  lat_radians_perimeter <- asin(sin(lat_radians_center)*
+                                  cos(circle_radius/earth_radius) + 
+                                  cos(lat_radians_center)*
+                                  sin(circle_radius/earth_radius)*
+                                  cos(angle_radians))
+  lon_radians_perimeter <- lon_radians_center + 
+    atan2(sin(angle_radians)*
+            sin(circle_radius/earth_radius)*
+            cos(lat_radians_center),
+          cos(circle_radius/earth_radius) - 
+            sin(lat_radians_center)*
+            sin(lat_radians_perimeter))
+  lat_degrees_perimeter <- lat_radians_perimeter*(180/pi)
+  lon_degrees_perimeter <- lon_radians_perimeter*(180/pi)
+  return(data.frame(x = lon_degrees_perimeter, y = lat_degrees_perimeter))
+}
+
+# convert to a spatial object with crs WGS84
+circle <- get_5mr(centerpoint$lat, centerpoint$lon)
+circle <- cbind(circle$x, circle$y)
+# copy the first point to the end of the matrix so the polygon can close
+circle <- list(rbind(circle, circle[1, 1:2]))
+circle <- st_sfc(st_polygon(circle), crs = 4326)
+
+st_write(circle, here(paste0(name, "_5mr.kml")), driver = "kml")
